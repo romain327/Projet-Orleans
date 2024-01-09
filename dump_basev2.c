@@ -19,7 +19,7 @@ void print_table(table_t * table) {
 	printf("Name: %s\n", table->name);
 	printf("Size: %d\n", table->size);
 	printf("Reserved: %d\n", table->reserved);
-	printf("Datetime: %s\n", table->datetime_str);
+	//printf("Datetime: %s\n", table->datetime_str);
 	printf("\n");
 }
 
@@ -61,9 +61,6 @@ int main() {
 	table_t table_t_list[struct_nb];
 	lseek(fd, 0, SEEK_SET);
 
-	// On peut maintenant fermer le fichier puisqu'on va l'ouvrir d'une autre manière.
-	close(fd);
-
 	/*
 	 * On affiche le nombre de structures table_t qu'on a trouvé.
 	 * Techniquement parlant, elles n'ont pas encore été crées, mais on sait déjà qu'on en aura struct_nb.
@@ -75,15 +72,14 @@ int main() {
 	 * Cela nous donne un pointeur de fichier, on a donc un flux de caractères, et non plus un entier comme précédement.
 	 * On peut maintenant lire le fichier et remplir notre tableau de structures.
 	 */
-	FILE * fp = fopen("flash10.bin", "rb");
 	while(j<struct_nb) {
-		fread(table_t_list[j].name, 1, 12, fp);
-		fread(&table_t_list[j].size, 4, 1, fp);
-		fread(&table_t_list[j].reserved, 4, 1, fp);
-		fread(table_t_list[j].datetime_str, 1, 28, fp);
+		read(fd, &table_t_list[j].name, 12);
+		read(fd, &table_t_list[j].size, 4);
+		read(fd, &table_t_list[j].reserved, 4);
+		read(fd, &table_t_list[j].datetime_str, 28);
 		j++;
 	}
-	fclose(fp);
+	close(fd);
 
 	/*
 	 * On affiche les structures qu'on a créées.
