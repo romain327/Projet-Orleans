@@ -25,14 +25,12 @@ void print_table(table_t * table) {
 
 int main() {
 	uint32_t struct_nb = 0;
-	uint32_t j = 0;
+	uint32_t cpt = 0;
 	uint8_t c = 0x0;
 	uint8_t * temp_c = &c;
 
 	/*
-	 * On ouvre le fichier flash10.bin en lecture seule. Cela nous donne un descripteur de fichier.
-	 * Le fait qu'on manipule un descripteur de fichier est important ici dans le sens où on va ouvrir le
-	 * fichier d'une autre manière plus tard.
+	 * On ouvre le fichier flash10.bin en lecture seule. Cela nous donne un numéro de descripteur de fichier.
 	 */
 	const uint32_t fd = open("flash10.bin", O_RDONLY);
 	if(fd == -1) {
@@ -68,25 +66,23 @@ int main() {
 	printf("Nombre de structures: %d\n", struct_nb);
 
 	/*
-	 * On ouvre le fichier flash10.bin en lecture seule, mais cette fois-ci avec fopen.
-	 * Cela nous donne un pointeur de fichier, on a donc un flux de caractères, et non plus un entier comme précédement.
-	 * On peut maintenant lire le fichier et remplir notre tableau de structures.
+	 * On lit les structures du fichier et on les stocke dans le tableau de structures qu'on a créé.
 	 */
-	while(j<struct_nb) {
-		read(fd, &table_t_list[j].name, 12);
-		read(fd, &table_t_list[j].size, 4);
-		read(fd, &table_t_list[j].reserved, 4);
-		read(fd, &table_t_list[j].datetime_str, 28);
-		j++;
+	while(cpt<struct_nb) {
+		read(fd, &table_t_list[cpt].name, 12);
+		read(fd, &table_t_list[cpt].size, 4);
+		read(fd, &table_t_list[cpt].reserved, 4);
+		read(fd, &table_t_list[cpt].datetime_str, 28);
+		cpt++;
 	}
 	close(fd);
 
 	/*
 	 * On affiche les structures qu'on a créées.
 	 */
-	j = 0;
-	while(j<struct_nb) {
-		print_table(&table_t_list[j]);
-		j++;
+	cpt = 0;
+	while(cpt<struct_nb) {
+		print_table(&table_t_list[cpt]);
+		cpt++;
 	}
 }
