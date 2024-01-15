@@ -16,6 +16,7 @@ package Principal is
 		end record;
 		
 	procedure Print_table_t(structure : table_t);
+	function get_nb_struct(F : Direct_IO.File_Type; File_Name : String) return Integer;
 	function main() return Integer;
 end Principal;
 
@@ -28,12 +29,19 @@ package body Principal is
 		Put_Line("Datetime : ") & table_t.Datetime_str);
 	end Print_table_t;
 	
-	function get_nb_struct(F : Direct) is
+	function get_nb_struct(F : Direct_IO.File_Type, File_Name : String) is
 	    Struct_nb : Integer := 0;
+	    File_In : Direct_IO.File_Mode := Direct_IO.In_File;
+	    C : uint8_t := 16#0#;
+	    Ptr_c : Ptr := C.all'address;
     begin
 		Direct_IO.Open(F, File_In, File_Name);
-        Direct_IO.Read(F, ptr_c, 1);
-        Struct_nb := Integer(c);
+        Direct_IO.Read(F, Ptr_c, 1);
+        while C = 16#FF# loop
+            Direct_IO.Read(F, Ptr_c, 1);
+            Struct_nb := Struct_nb + 1;
+            Direct_IO.Set_Index(F, Direct_IO.Index(F) + table_t'Size);
+        end loop;
         Put_Line("Nombre de structures : " & Integer'Image(Struct_nb));
 
         return Struct_nb;
@@ -46,15 +54,13 @@ package body Principal is
     end get_nb_struct;
 
     function main() is
-        J : Integer := 0;
-        C : uint8_t := 16#0#;
-        ptr_c : Ptr := c.all'address;
+        Cpt : Integer := 0;
         File_Name : String := "flash10.bin";
-        File_In : Direct_IO.File_Mode := Direct_IO.In_File;
         F : Direct_IO.File_Type;
     begin
-
-
+        Cpt := get_nb_struct(F, File_Name);
+        return Cpt;
+    end main;
 end Principal;
 		
 		

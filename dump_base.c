@@ -13,13 +13,13 @@ typedef struct table_s {
 
 /**
  * \brief routine d'impression des structures qui composent la fat
- * \param table structure à afficher
+ * \param table_t_struct structure à afficher
  */
-void print_table(table_t * table) {
-	printf("Name: %s\n", table->name);
-	printf("Size: %d\n", table->size);
-	printf("Reserved: %d\n", table->reserved);
-	printf("Datetime: %s\n", table->datetime_str);
+void print_table(table_t * table_t_struct) {
+	printf("Name: %s\n", table_t_struct->name);
+	printf("Size: %d\n", table_t_struct->size);
+	printf("Reserved: %d\n", table_t_struct->reserved);
+	printf("Datetime: %s\n", table_t_struct->datetime_str);
 	printf("\n");
 }
 
