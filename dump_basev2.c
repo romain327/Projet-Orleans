@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <string.h>
+
+// On définit une macro qui va nous permettre de récupérer la taille d'un membre d'une structure.
+#define member_size(type, member) sizeof(((type *)0)->member)
 
 typedef struct table_s {
 	char name[12];
@@ -15,19 +19,24 @@ typedef struct table_s {
  * \brief routine d'impression des structures qui composent la fat
  * \param table_t_struct structure à afficher
  */
-void print_table(table_t * table_t_struct) {
+void print_table(table_t * table_t_struct, char * datetime_str2) {
 	printf("Name: %s\n", table_t_struct->name);
 	printf("Size: %d\n", table_t_struct->size);
 	printf("Reserved: %d\n", table_t_struct->reserved);
-	printf("Datetime: %s\n", table_t_struct->datetime_str);
+	memcpy(datetime_str2, table_t_struct->datetime_str, sizeof(table_t_struct->datetime_str));
+	printf("Datetime: %s\n", datetime_str2);
 	printf("\n");
 }
 
 int main() {
 	uint32_t struct_nb = 0;
+	uint32_t real_struct_nb = 0;
 	uint32_t cpt = 0;
+	uint32_t cpt2;
 	uint8_t c = 0x0;
+	uint8_t rc;
 	uint8_t * temp_c = &c;
+	uint8_t * temp_rc = &rc;
 
 	/*
 	 * On ouvre le fichier flash10.bin en lecture seule. Cela nous donne un numéro de descripteur de fichier.
@@ -44,31 +53,37 @@ int main() {
 	 * mais que ce n'est plus le cas après, tant que ce 16ème octet vaut 0x00, on sait qu'on est dans une structure table_t.
 	 * Cela nous permet de récupérer le nombre de structures table_t dans le fichier, qui sera stocké dans l'entier struct_nb.
 	 */
-	lseek(fd, 15, SEEK_SET);
 	while(c == 0x0) {
+		read(fd, temp_rc, 1);
+		if(rc != 0x20) {
+			real_struct_nb++;
+		}
+		lseek(fd, 14, SEEK_CUR);
 		read(fd, temp_c, 1);
 		struct_nb++;
-		lseek(fd, sizeof(table_t)-1, SEEK_CUR);
+		lseek(fd, 32, SEEK_CUR);
 	}
 
 	/*
-	 * On retranche 1 au nombre de structure puisqu'on en a compté une de trop.
-	 * On alloue un tableau de structures table_t de taille struct_nb, et on se repositionne au début du fichier.
+	 * On retranche 1 au nombre de structure puisqu'on en a compté une de trop, et on affiche le nombre de structures.
 	 */
 	struct_nb--;
-	table_t table_t_array[struct_nb];
+	real_struct_nb--;
+	printf("Nombre de structures: %d\n", struct_nb);
+	printf("Nombre de structures non vides: %d\n", real_struct_nb);
+
+
+
+	table_t table_t_array[real_struct_nb];
 	lseek(fd, 0, SEEK_SET);
 
-	/*
-	 * On affiche le nombre de structures table_t qu'on a trouvé.
-	 * Techniquement parlant, elles n'ont pas encore été crées, mais on sait déjà qu'on en aura struct_nb.
-	 */
-	printf("Nombre de structures: %d\n", struct_nb);
+
 
 	/*
 	 * On lit les structures du fichier et on les stocke dans le tableau de structures qu'on a créé.
 	 */
-	while(cpt<struct_nb) {
+	while(cpt<real_struct_nb) {
+		memset(&table_t_array[cpt], 0, sizeof(table_t_array[cpt]));
 		read(fd, &table_t_array[cpt].name, 12);
 		read(fd, &table_t_array[cpt].size, 4);
 		read(fd, &table_t_array[cpt].reserved, 4);
@@ -77,11 +92,14 @@ int main() {
 	}
 
 	/*
-	 * On affiche les structures qu'on a créées.
+	 * On cherche à afficher uniquement les structures qui ne sont pas vides
 	 */
+	const int sizeof_datetime_str2 = member_size(table_t, datetime_str)+1;
+	char datetime_str2[sizeof_datetime_str2];
 	cpt = 0;
-	while(cpt<struct_nb) {
-		print_table(&table_t_array[cpt]);
+	while(cpt<real_struct_nb) {
+		memset(datetime_str2, 0, sizeof_datetime_str2);
+		print_table(&table_t_array[cpt], datetime_str2);
 		cpt++;
 	}
 
@@ -97,32 +115,54 @@ int main() {
 	 * Enfin, on ferme le fichier, et on passe à la structure suivante.
 	 */
 	cpt = 0;
-	uint8_t cpt2 = 0;
-	while(cpt<struct_nb || table_t_array[cpt].size != 0) {
-		char content[table_t_array[cpt].size];
+	lseek(fd, 0, SEEK_SET);
+	while(cpt<real_struct_nb) {
+		cpt2 = 0;
+		char content[table_t_array[cpt].size + 1];
 		read(fd, &content, table_t_array[cpt].size);
 
-		for(char i = 0; i < 12; i++) {
-			while(table_t_array[cpt].name[i] != 0x20 && table_t_array[cpt].name[i] != 0x0) {
+		for(int i = 0; i < member_size(table_t, name); i++) {
+			if(table_t_array[cpt].name[i] != 0x20 && table_t_array[cpt].name[i] != 0x0) {
 				cpt2++;
 			}
 		}
+		cpt2--;
 
-		char n[cpt2];
-		for(char i = 0; i < cpt2; i++) {
+		char n[cpt2+1];
+		for(int i = 0; i < cpt2; i++) {
 			n[i] = table_t_array[cpt].name[i];
 		}
+		n[cpt2] = '\0';
 
-		char *cmd = malloc((11 + cpt2)*sizeof(char));
-		sprintf(cmd, "touch %s %s", n, ".txt");
+		char * name = malloc((cpt2 + 4));
+		sprintf(name, "%s%s", n, ".txt");
+		char * cmd = malloc(sizeof(name) + 6);
+		sprintf(cmd, "touch %s%s", n, ".txt");
 		system(cmd);
 		free(cmd);
 
-		const ssize_t fd2 = open(table_t_array[cpt].name, O_WRONLY);
+		const ssize_t fd2 = open(name, O_WRONLY);
+		if(fd2 == -1) {
+			perror("Ce fichier n'existe pas.");
+			exit(0);
+		}
 		write(fd2, &content, table_t_array[cpt].size);
 		close(fd2);
-		cpt++;
-	}
 
+		const ssize_t fd3 = open(name, O_WRONLY);
+		if(fd3 == -1) {
+			perror("Ce fichier n'existe pas.");
+			exit(0);
+		}
+		off_t offset = lseek(fd3, 0, SEEK_END);
+		if(offset != table_t_array[cpt].size) {
+			printf("%s%s\n", "Erreur lors de l'écriture du fichier ", name);
+			printf("%ld\n", offset);
+		}
+		close(fd3);
+
+		free(name);
+		cpt++;
+		}
 	close(fd);
 }
