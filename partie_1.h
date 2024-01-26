@@ -1,5 +1,7 @@
 #ifndef PARTIE_1_H
 #define PARTIE_1_H
+
+// définition d'une macro permettant de récupérer la taille d'un champ d'une structure
 #define member_size(type, member) sizeof(((type *)0)->member
 
 #include <stdio.h>

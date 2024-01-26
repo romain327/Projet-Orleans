@@ -1,5 +1,6 @@
 #include "partie_2.h"
 
+// routine d'affichage des structures dico
 void print_dico_entry(dico_entry_t * dico_entry_struct) {
 	printf("Name: %s\n", dico_entry_struct->name);
 	printf("Addr1: %d\n", dico_entry_struct->addr1);
@@ -21,6 +22,7 @@ void partie_2(char * filename) {
 		exit(0);
 	}
 
+	// récupération du nombre de structures dans la variabke cpt3
 	while(cd != 0x20) {
 		read(fd_dico, temp_cd, 1);
 		cpt3++;
@@ -31,6 +33,7 @@ void partie_2(char * filename) {
 	lseek(fd_dico, 0, SEEK_SET);
 	dico_entry_t dico_array[cpt3];
 
+	// lecture du fichier et remplissage des structures
 	while(cpt4 < cpt3) {
 		memset(&dico_array[cpt4], 0, sizeof(dico_array[cpt4]));
 		read(fd_dico, &dico_array[cpt4].name,	member_size(dico_entry_t, name)));
@@ -47,6 +50,7 @@ void partie_2(char * filename) {
 		cpt4++;
 	}
 
+	// création du répertoire son s'il n'existe pas
 	if(system("test -d son") != 0) {
 		system("mkdir son/");
 	}
@@ -59,16 +63,19 @@ void partie_2(char * filename) {
 
 	cpt4 = 0;
 	while(cpt4 < cpt3) {
+		// calcul de la taille du fichier à écrire et lecture du contenu
 		addr = dico_array[cpt4].addr2 - dico_array[cpt4].addr1;
 		char content[addr + 1];
 		lseek(fd_son, dico_array[cpt4].addr1, SEEK_SET);
 		read(fd_son, &content, addr);
 
+		// préparation du nom
 		char name[member_size(dico_entry_t, name))+1];
 		memset(&name, 0, member_size(dico_entry_t, name)+1));
 		memcpy(&name, &dico_array[cpt4].name, member_size(dico_entry_t, name)+1));
 		name[member_size(dico_entry_t, name))] = '\0';
 
+		// remplacement des '/' qui posent problème lors de la création du fichier par des '_'
 		for(int i = 0; i < member_size(dico_entry_t, name))+1; i++) {
 			if(name[i] == '/') {
 				name[i] = '_';
@@ -78,6 +85,7 @@ void partie_2(char * filename) {
 		char * file = malloc(member_size(dico_entry_t, name) + 9));
 		sprintf(file, "son/%s%s", name, ".bin");
 
+		// création et écriture du fichier
 		const ssize_t fd_write = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
 		if(fd_write == -1) {
 			printf("Ce fichier n'existe pas.\n");
@@ -91,6 +99,7 @@ void partie_2(char * filename) {
 			exit(0);
 		}
 
+		// vérification des octets écrits
 		off_t offset = lseek(fd_verify, 0, SEEK_END);
 		if(offset != addr) {
 			printf("Erreur lors de l'écriture du fichier %s, taille supposée : %d octets, taille réelle : %ld octets", file, addr, offset);
