@@ -13,7 +13,10 @@ $(TARGET): $(OBJFILES)
 %.o: %.c $(HDRFILES)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: clean
+.PHONY: run clean
+
+run: $(TARGET)
+	./$(TARGET)
 
 clean:
 	rm -f $(OBJFILES) $(TARGET)
