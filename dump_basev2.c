@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // On définit une macro qui va nous permettre de récupérer la taille d'un membre d'une structure.
 #define member_size(type, member) sizeof(((type *)0)->member)
@@ -15,6 +16,13 @@ typedef struct table_s {
 	char datetime_str[28];
 } __attribute__((packed)) table_t;
 
+typedef struct dico_entry_s {
+	char name[8];
+	uint32_t addr1;
+	uint32_t addr2;
+	uint16_t cnt;
+} __attribute__((packed)) dico_entry_t;
+
 /**
  * \brief routine d'impression des structures qui composent la fat
  * \param table_t_struct structure à afficher
@@ -25,6 +33,14 @@ void print_table(table_t * table_t_struct, char * datetime_str2) {
 	printf("Reserved: %d\n", table_t_struct->reserved);
 	memcpy(datetime_str2, table_t_struct->datetime_str, sizeof(table_t_struct->datetime_str));
 	printf("Datetime: %s\n", datetime_str2);
+	printf("\n");
+}
+
+void print_dico_entry(dico_entry_t * dico_entry_struct) {
+	printf("Name: %s\n", dico_entry_struct->name);
+	printf("Addr1: %d\n", dico_entry_struct->addr1);
+	printf("Addr2: %d\n", dico_entry_struct->addr2);
+	printf("Cnt: %d\n", dico_entry_struct->cnt);
 	printf("\n");
 }
 
@@ -72,22 +88,18 @@ int main() {
 	printf("Nombre de structures: %d\n", struct_nb);
 	printf("Nombre de structures non vides: %d\n", real_struct_nb);
 
-
-
 	table_t table_t_array[real_struct_nb];
 	lseek(fd, 0, SEEK_SET);
-
-
 
 	/*
 	 * On lit les structures du fichier et on les stocke dans le tableau de structures qu'on a créé.
 	 */
 	while(cpt<real_struct_nb) {
 		memset(&table_t_array[cpt], 0, sizeof(table_t_array[cpt]));
-		read(fd, &table_t_array[cpt].name, 12);
-		read(fd, &table_t_array[cpt].size, 4);
-		read(fd, &table_t_array[cpt].reserved, 4);
-		read(fd, &table_t_array[cpt].datetime_str, 28);
+		read(fd, &table_t_array[cpt].name, member_size(table_t, name));
+		read(fd, &table_t_array[cpt].size, member_size(table_t, size));
+		read(fd, &table_t_array[cpt].reserved, member_size(table_t, reserved));
+		read(fd, &table_t_array[cpt].datetime_str, member_size(table_t, datetime_str));
 		cpt++;
 	}
 
@@ -134,14 +146,10 @@ int main() {
 		}
 		n[cpt2] = '\0';
 
-		char * name = malloc((cpt2 + 4));
-		sprintf(name, "%s%s", n, ".txt");
-		char * cmd = malloc(sizeof(name) + 6);
-		sprintf(cmd, "touch %s%s", n, ".txt");
-		system(cmd);
-		free(cmd);
+		char * name = malloc(cpt2 + 4);
+		sprintf(name, "%s%s", n, ".bin");
 
-		const ssize_t fd2 = open(name, O_WRONLY);
+		const ssize_t fd2 = open(name, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
 		if(fd2 == -1) {
 			perror("Ce fichier n'existe pas.");
 			exit(0);
@@ -149,20 +157,115 @@ int main() {
 		write(fd2, &content, table_t_array[cpt].size);
 		close(fd2);
 
-		const ssize_t fd3 = open(name, O_WRONLY);
+		const ssize_t fd3 = open(name, O_RDONLY);
 		if(fd3 == -1) {
 			perror("Ce fichier n'existe pas.");
 			exit(0);
 		}
+
 		off_t offset = lseek(fd3, 0, SEEK_END);
 		if(offset != table_t_array[cpt].size) {
-			printf("%s%s\n", "Erreur lors de l'écriture du fichier ", name);
-			printf("%ld\n", offset);
+			printf("Erreur lors de l'écriture du fichier %s, taille supposée : %d octets, taille réelle : %ld octets", name, table_t_array[cpt].size, offset);
 		}
 		close(fd3);
 
 		free(name);
 		cpt++;
-		}
+	}
 	close(fd);
+
+
+	// PARTIE 2
+	char cd = 0x0;
+	char * temp_cd = &cd;
+	int cpt3 = 0;
+	int cpt4 = 0;
+	int cpt5 = 0;
+	int addr;
+
+	const int fd_dico = open("DICO.bin", O_RDONLY);
+	if(fd_dico == -1) {
+		perror("Ce fichier n'existe pas.");
+		exit(0);
+	}
+
+	while(cd != 0x20) {
+		read(fd_dico, temp_cd, 1);
+		cpt3++;
+		lseek(fd_dico, sizeof(dico_entry_t)-1, SEEK_CUR);
+	}
+	cpt3--;
+
+	lseek(fd_dico, 0, SEEK_SET);
+	dico_entry_t dico_array[cpt3];
+
+	while(cpt4 < cpt3) {
+		memset(&dico_array[cpt4], 0, sizeof(dico_array[cpt4]));
+		read(fd_dico, &dico_array[cpt4].name,	member_size(dico_entry_t, name));
+		read(fd_dico, &dico_array[cpt4].addr1, member_size(dico_entry_t, addr1));
+		read(fd_dico, &dico_array[cpt4].addr2, member_size(dico_entry_t, addr2));
+		read(fd_dico, &dico_array[cpt4].cnt, member_size(dico_entry_t, cnt));
+		cpt4++;
+	}
+	close(fd_dico);
+
+	cpt4 = 0;
+	while(cpt4 < cpt3) {
+		print_dico_entry(&dico_array[cpt4]);
+		cpt4++;
+	}
+
+	if(system("test -d son") != 0) {
+		system("mkdir son/");
+	}
+
+	int fd_son = open("SON.bin", O_RDONLY);
+	if(fd_son == -1) {
+		perror("Ce fichier n'existe pas.");
+		exit(0);
+	}
+
+	cpt4 = 0;
+	while(cpt4 < cpt3) {
+		addr = dico_array[cpt4].addr2 - dico_array[cpt4].addr1;
+		char content[addr + 1];
+		lseek(fd_son, dico_array[cpt4].addr1, SEEK_SET);
+		read(fd_son, &content, addr);
+
+		char name[member_size(dico_entry_t, name)+1];
+		memset(&name, 0, member_size(dico_entry_t, name)+1);
+		memcpy(&name, &dico_array[cpt4].name, member_size(dico_entry_t, name)+1);
+		name[member_size(dico_entry_t, name)] = '\0';
+
+		for(int i = 0; i < member_size(dico_entry_t, name)+1; i++) {
+			if(name[i] == '/') {
+				name[i] = '_';
+			}
+		}
+
+		char * file = malloc(member_size(dico_entry_t, name) + 9);
+		sprintf(file, "son/%s%s", name, ".bin");
+
+		const ssize_t fd_write = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+		if(fd_write == -1) {
+			printf("Ce fichier n'existe pas.\n");
+		}
+		write(fd_write, &content, addr);
+		close(fd_write);
+
+		const ssize_t fd_verify = open(file, O_RDONLY);
+		if(fd_verify == -1) {
+			perror("Ce fichier n'existe pas.");
+			exit(0);
+		}
+
+		off_t offset = lseek(fd_verify, 0, SEEK_END);
+		if(offset != addr) {
+			printf("Erreur lors de l'écriture du fichier %s, taille supposée : %d octets, taille réelle : %ld octets", file, addr, offset);
+		}
+		close(fd_verify);
+
+		free(file);
+		cpt4++;
+	}
 }
